@@ -1,0 +1,11 @@
+[package]
+name = "isa"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iced-x86 = "1.21"
+mbdi-interfaces = { path = "../../../interfaces" }
+
+[dev-dependencies]
+object = "0.36"

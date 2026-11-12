@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "engine",
+    "interfaces",
+    "plugins/infrastructure/isa",
+    "tools/host",
+]
+resolver = "3"

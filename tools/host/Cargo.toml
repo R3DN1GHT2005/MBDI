@@ -1,0 +1,9 @@
+[package]
+name = "mbdi-host"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mbdi-engine= {path="../../engine"}
+isa={path= "../../plugins/infrastructure/isa"}
+object="0.36"

@@ -1,0 +1,14 @@
+/target/
+
+/dist/
+/artifacts/
+
+
+*.exe
+*.dll
+*.pdb
+*.ilk
+
+.vs/
+Thumbs.db
+Desktop.ini

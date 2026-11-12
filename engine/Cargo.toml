@@ -1,0 +1,10 @@
+[package]
+name = "mbdi-engine"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mbdi-interfaces = { path = "../interfaces" }
+
+[dev-dependencies]
+isa = { path = "../plugins/infrastructure/isa" }
