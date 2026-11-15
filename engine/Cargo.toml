@@ -8,3 +8,6 @@ mbdi-interfaces = { path = "../interfaces" }
 
 [dev-dependencies]
 isa = { path = "../plugins/infrastructure/isa" }
+
+[target.'cfg(windows)'.dev-dependencies]
+platform-windows = { path = "../plugins/infrastructure/platform-windows" }

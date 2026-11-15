@@ -3,6 +3,7 @@ members = [
     "engine",
     "interfaces",
     "plugins/infrastructure/isa",
-    "tools/host",
+    "plugins/infrastructure/platform-windows",
+    "tools/host"
 ]
 resolver = "3"
