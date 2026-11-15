@@ -1,3 +1,5 @@
+use mbdi_interfaces::WritableCode;
+use std::mem::MaybeUninit;
 use std::{io, ptr, ptr::NonNull};
 use windows_sys::Win32::System::{
     Diagnostics::Debug::FlushInstructionCache,
@@ -5,11 +7,9 @@ use windows_sys::Win32::System::{
         MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_READWRITE, VirtualAlloc,
         VirtualFree, VirtualProtect,
     },
+    SystemInformation::{GetSystemInfo, SYSTEM_INFO},
     Threading::GetCurrentProcess,
-    SystemInformation::{GetSystemInfo,SYSTEM_INFO}
 };
-use std::mem::MaybeUninit;
-use mbdi_interfaces::WritableCode;
 
 pub struct CodeMemory {
     base: NonNull<u8>,
@@ -71,9 +71,9 @@ impl CodeMemory {
     }
 }
 
-pub fn page_size() -> usize{
-    let mut info=MaybeUninit::<SYSTEM_INFO>::uninit();
-    unsafe{
+pub fn page_size() -> usize {
+    let mut info = MaybeUninit::<SYSTEM_INFO>::uninit();
+    unsafe {
         GetSystemInfo(info.as_mut_ptr());
         info.assume_init().dwPageSize as usize
     }
@@ -93,12 +93,12 @@ impl Drop for CodeMemory {
     }
 }
 
-impl WritableCode for CodeMemory{
-    type Executable=ExecutableCode;
-    fn address(&self) -> u64{
+impl WritableCode for CodeMemory {
+    type Executable = ExecutableCode;
+    fn address(&self) -> u64 {
         CodeMemory::address(self)
     }
-    fn publish(self,bytes: &[u8]) -> io::Result<Self::Executable>{
-        CodeMemory::publish(self,bytes)
+    fn publish(self, bytes: &[u8]) -> io::Result<Self::Executable> {
+        CodeMemory::publish(self, bytes)
     }
 }

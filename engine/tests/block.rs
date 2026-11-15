@@ -1,7 +1,7 @@
 use isa::{decode_one, relocate_block};
 use mbdi_engine::translation::block::{BlockExit, build_block};
 use mbdi_engine::translation::cache::CodeCache;
-use platform_windows::executable::{CodeMemory, ExecutableCode,page_size};
+use platform_windows::executable::{CodeMemory, ExecutableCode, page_size};
 
 #[test]
 fn conditional_branch_ends_block() {
@@ -46,29 +46,31 @@ fn executes_cached_block_twice() {
     let original = [0xB8, 42, 0, 0, 0, 0xC3]; // mov eax, 42; ret
     let mut cache = CodeCache::<ExecutableCode>::default();
     let mut translations = 0;
-    let page_bytes=page_size();
-    let mut allocation_attempts=0;
-    
+    let page_bytes = page_size();
+    let mut allocation_attempts = 0;
+
+    use mbdi_engine::translation::translate::translate_block;
+
     let mut translate = || -> std::io::Result<_> {
         translations += 1;
 
         let block =
             build_block(&original, 64, 0x1000, decode_one).expect("block construction failed");
-        
-        let mut capacity=4;
 
-        for _ in 0..2{
-            allocation_attempts+=1;
-            let memory=CodeMemory::allocate(capacity)?;
-
-            let bytes=relocate_block(&original,64,0x1000,memory.address()).expect("relocation failed");
-            if bytes.len() <=capacity{
-                let code=memory.publish(&bytes)?;
-                return Ok((code,block.exit));
-            }
-            capacity=bytes.len().div_ceil(page_bytes).checked_mul(page_bytes).ok_or_else(|| std::io::Error::other("code capacity overflow"))?;
-        }
-        Err(std::io::Error::other("relocated block does not fit after two attempts"))
+        translate_block(
+            block,
+            &original,
+            page_bytes,
+            4,
+            |capacity| {
+                allocation_attempts += 1;
+                CodeMemory::allocate(capacity)
+            },
+            |bytes, bitness, source, destination| {
+                relocate_block(bytes, bitness, source, destination)
+                    .map_err(|err| std::io::Error::other(format!("relocation failed: {err:?}")))
+            },
+        )
     };
 
     for _ in 0..2 {
@@ -86,5 +88,5 @@ fn executes_cached_block_twice() {
     }
 
     assert_eq!(translations, 1);
-    assert_eq!(allocation_attempts,2);
+    assert_eq!(allocation_attempts, 2);
 }
