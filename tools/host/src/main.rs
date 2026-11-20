@@ -1,5 +1,9 @@
 use isa::{decode, decode_one};
 use mbdi_engine::translation::block::build_block;
+use mbdi_engine::{
+    execution::dispatcher::GuestLocation,
+    translation::source::{CodeImage, CodeRegion, CodeSource},
+};
 use object::{Architecture, BinaryFormat, Object, ObjectSection, SectionFlags};
 use std::{env, error::Error, ffi::OsStr, path::Path};
 
@@ -17,20 +21,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn inspect_pe(path: &Path) -> Result<(), Box<dyn Error>> {
-    let data = std::fs::read(path)?;
-    let pe = object::File::parse(data.as_slice())?;
+    let file_bytes = std::fs::read(path)?;
+    let pe = object::File::parse(file_bytes.as_slice())?;
+
     if pe.format() != BinaryFormat::Pe {
-        return Err("File is not a pe!".into());
+        return Err("File is not a PE image".into());
     }
+
     let bitness = match pe.architecture() {
         Architecture::X86_64 => 64,
         Architecture::I386 => 32,
-        _ => return Err("Unsupported architecture!".into()),
+        _ => return Err("Unsupported architecture".into()),
     };
+
     let entry = pe.entry();
     if entry == 0 || entry == pe.relative_address_base() {
-        return Err("File has no entry point!".into());
+        return Err("File has no entry point".into());
     }
+
+    let mut regions = Vec::new();
+
     for section in pe.sections() {
         let SectionFlags::Coff { characteristics } = section.flags() else {
             continue;
@@ -40,37 +50,51 @@ fn inspect_pe(path: &Path) -> Result<(), Box<dyn Error>> {
             continue;
         }
 
-        let Some(offset) = entry.checked_sub(section.address()) else {
-            continue;
-        };
-
-        if offset >= section.size() {
-            continue;
-        }
-
         let data = section.data()?;
-        let start = usize::try_from(offset)?;
-        let end = usize::try_from(section.size().min(data.len() as u64))?;
-        let code = data
-            .get(start..end)
-            .filter(|bytes| !bytes.is_empty())
-            .ok_or("Section has no code at entry point!")?;
+        let length = section.size().min(data.len() as u64) as usize;
 
-        let block = build_block(code, bitness, entry, decode_one)
-            .map_err(|e| format!("Failed to build block: {e:?}"))?;
-        let block_len: usize = block
-            .instructions
-            .iter()
-            .map(|instruction| usize::from(instruction.length))
-            .sum();
-        println!("File: {}", path.display());
-        println!("PE: {bitness}-bit | entry {entry:#x}");
-        println!("First block: {} instructions", block.instructions.len());
-
-        for (address, assembly) in decode(&code[..block_len], bitness, entry)? {
-            println!("{address:#x}: {assembly}");
+        if length == 0 {
+            continue;
         }
-        println!("Exit:{:x?}", block.exit);
+
+        regions.push(CodeRegion {
+            start_address: section.address(),
+            bitness,
+            bytes: &data[..length],
+        });
     }
-    Err("Not in a executable section!".into())
+
+    let location = GuestLocation {
+        guest_ip: entry,
+        bitness,
+    };
+
+    let image = CodeImage {
+        entry: location,
+        regions: &regions,
+    };
+
+    let code = image
+        .bytes_at(location)
+        .map_err(|error| format!("Cannot read code at {:#x}: {error:?}", location.guest_ip))?;
+
+    let block = build_block(code, bitness, entry, decode_one)
+        .map_err(|error| format!("Failed to build block: {error:?}"))?;
+
+    let block_len: usize = block
+        .instructions
+        .iter()
+        .map(|instruction| usize::from(instruction.length))
+        .sum();
+
+    println!("File: {}", path.display());
+    println!("PE: {bitness}-bit | entry {entry:#x}");
+    println!("First block: {} instructions", block.instructions.len());
+
+    for (address, assembly) in decode(&code[..block_len], bitness, entry)? {
+        println!("{address:#x}: {assembly}");
+    }
+
+    println!("Exit: {:x?}", block.exit);
+    Ok(())
 }
