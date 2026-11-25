@@ -4,6 +4,7 @@ members = [
     "interfaces",
     "plugins/infrastructure/isa",
     "plugins/infrastructure/platform-windows",
+    "plugins/infrastructure/arch-runtime",
     "tools/host"
 ]
 resolver = "3"

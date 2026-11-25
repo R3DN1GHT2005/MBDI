@@ -11,3 +11,4 @@ isa = { path = "../plugins/infrastructure/isa" }
 
 [target.'cfg(windows)'.dev-dependencies]
 platform-windows = { path = "../plugins/infrastructure/platform-windows" }
+mbdi-arch-runtime={ path = "../plugins/infrastructure/arch-runtime" }

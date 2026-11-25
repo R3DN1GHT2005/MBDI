@@ -124,4 +124,57 @@ impl X64Gate {
     pub unsafe fn run(&mut self, cache_entry: u64) {
         unsafe { mbdi_x64_enter(&mut *self.frame, cache_entry) };
     }
+
+    pub fn call_to(&self, target: u64, return_address: u64) -> [u8; 65] {
+        let jump = self.exit_to(target);
+        let mut code = [0; 65];
+        // Save guest RAX before using it as scratch.
+        code[..10].copy_from_slice(&jump[..10]);
+        // mov rax, return_address
+        code[10..12].copy_from_slice(&[0x48, 0xB8]);
+        code[12..20].copy_from_slice(&return_address.to_le_bytes());
+        //push rax - RSP still points to the guest stack
+        code[20] = 0x50;
+        //Record the call target and return to the dispatcher
+        code[21..].copy_from_slice(&jump[10..]);
+        code
+    }
+    pub fn return_to_guest(&self) -> [u8; 45] {
+        let jump = self.exit_to(0);
+        let mut code = [0; 45];
+
+        // Save guest RAX before using it as scratch.
+        code[..10].copy_from_slice(&jump[..10]);
+        code[10] = 0x58; //pop rax
+        //Start at the store to next_guest_ip, after the imediate load.
+        code[11..].copy_from_slice(&jump[20..]);
+        code
+    }
+
+    pub fn emit_indirect_call(&self, target_load: &[u8], return_address: u64, code: &mut Vec<u8>) {
+        let exit = self.exit_to(0);
+        // Save guest RAX, then compute the target using the original guest RSP
+        code.extend_from_slice(&exit[..10]);
+        code.extend_from_slice(target_load);
+        // Store the computed target in next_guest_ip
+        code.extend_from_slice(&exit[20..30]);
+        //mov rax, return_address; push rax
+        code.extend_from_slice(&[0x48, 0xB8]);
+        code.extend_from_slice(&return_address.to_le_bytes());
+        code.push(0x50);
+
+        //Restore the GateFrame pointer and leave the cache
+        code.extend_from_slice(&exit[30..]);
+    }
+
+    pub fn emit_indirect_jump(&self, target_load: &[u8], code: &mut Vec<u8>) {
+        let exit = self.exit_to(0);
+
+        // Save guest RAX, then load the destination into RAX.
+        code.extend_from_slice(&exit[..10]);
+        code.extend_from_slice(target_load);
+
+        // Store next_guest_ip, load the GateFrame pointer, and leave the cache.
+        code.extend_from_slice(&exit[20..]);
+    }
 }

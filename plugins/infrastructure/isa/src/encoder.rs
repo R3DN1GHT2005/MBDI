@@ -1,6 +1,8 @@
 use iced_x86::{
-    BlockEncoder, BlockEncoderOptions, Decoder, DecoderOptions, IcedError, InstructionBlock,
+    BlockEncoder, BlockEncoderOptions, Code, Decoder, DecoderOptions, Encoder, IcedError,
+    Instruction, InstructionBlock, MemoryOperand, OpKind, Register,
 };
+use std::io;
 
 #[derive(Debug)]
 pub enum RelocateError {
@@ -86,4 +88,62 @@ pub fn emit_jcc_exit_x64(
     code.extend_from_slice(taken);
 
     Ok(())
+}
+
+pub fn encode_indirect_call_target_x64(original: &[u8], guest_ip: u64) -> io::Result<Vec<u8>> {
+    encode_near_indirect_target_x64(original, guest_ip, Code::Call_rm64)
+}
+
+pub fn encode_indirect_jump_target_x64(original: &[u8], guest_ip: u64) -> io::Result<Vec<u8>> {
+    encode_near_indirect_target_x64(original, guest_ip, Code::Jmp_rm64)
+}
+
+fn encode_near_indirect_target_x64(
+    original: &[u8],
+    guest_ip: u64,
+    expected: Code,
+) -> io::Result<Vec<u8>> {
+    let mut decoder = Decoder::with_ip(64, original, guest_ip, DecoderOptions::NONE);
+    let instruction = decoder.decode();
+
+    if instruction.code() != expected || decoder.can_decode() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("expected a single x64 {expected:?} instruction"),
+        ));
+    }
+
+    let mut load = match instruction.op0_kind() {
+        OpKind::Register => Instruction::with2(
+            Code::Mov_r64_rm64,
+            Register::RAX,
+            instruction.op0_register(),
+        ),
+        OpKind::Memory if instruction.is_ip_rel_memory_operand() => {
+            let slot = MemoryOperand::with_displ(instruction.ip_rel_memory_address(), 8);
+            Instruction::with2(Code::Mov_RAX_moffs64, Register::RAX, slot)
+        }
+        OpKind::Memory => {
+            let operand = MemoryOperand::new(
+                instruction.memory_base(),
+                instruction.memory_index(),
+                instruction.memory_index_scale(),
+                instruction.memory_displacement64() as i64,
+                instruction.memory_displ_size(),
+                false,
+                Register::None,
+            );
+            Instruction::with2(Code::Mov_r64_rm64, Register::RAX, operand)
+        }
+        _ => return Err(io::Error::other("unsupported indirect branch operand")),
+    }
+    .map_err(io::Error::other)?;
+
+    if instruction.op0_kind() == OpKind::Memory {
+        load.set_segment_prefix(instruction.segment_prefix());
+    }
+
+    let mut encoder = Encoder::new(64);
+    encoder.encode(&load, 0).map_err(io::Error::other)?;
+    Ok(encoder.take_buffer())
 }

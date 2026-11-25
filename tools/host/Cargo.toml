@@ -7,3 +7,7 @@ edition = "2024"
 mbdi-engine= {path="../../engine"}
 isa={path= "../../plugins/infrastructure/isa"}
 object="0.36"
+
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+mbdi-arch-runtime = { path = "../../plugins/infrastructure/arch-runtime" }
+platform-windows = { path = "../../plugins/infrastructure/platform-windows" }
