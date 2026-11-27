@@ -31,40 +31,44 @@ pub fn decode_one(
 ) -> Result<DecodedInstruction, DecodeError> {
     let mut decoder = Decoder::try_with_ip(bitness, bytes, address, DecoderOptions::NONE)
         .map_err(DecodeError::Setup)?;
+
     let instruction = decoder.decode();
     if instruction.is_invalid() {
         return Err(DecodeError::InvalidInstruction);
     }
+
     let near_target = matches!(
         instruction.op0_kind(),
         OpKind::NearBranch16 | OpKind::NearBranch32 | OpKind::NearBranch64
     );
+
     let flow = match instruction.flow_control() {
         FlowControl::Next => ControlFlow::Sequential,
         FlowControl::ConditionalBranch => ControlFlow::ConditionalBranch,
+        FlowControl::UnconditionalBranch
+            if bitness == 32 && instruction.code() == iced_x86::Code::Jmp_ptr1632 =>
+        {
+            ControlFlow::DirectFarJump {
+                selector: instruction.far_branch_selector(),
+                offset: instruction.far_branch32(),
+            }
+        }
         FlowControl::UnconditionalBranch if near_target => ControlFlow::DirectJump,
         FlowControl::IndirectBranch => ControlFlow::IndirectJump,
         FlowControl::Call if near_target => ControlFlow::DirectCall,
         FlowControl::IndirectCall => ControlFlow::IndirectCall,
+        FlowControl::Return if bitness == 64 && instruction.code() == iced_x86::Code::Retfq => {
+            ControlFlow::FarReturn64
+        }
         FlowControl::Return if instruction.mnemonic() == Mnemonic::Ret => ControlFlow::Return,
         _ => ControlFlow::Other,
-    };
-
-    let direct_target = if near_target
-        && matches!(
-            flow,
-            ControlFlow::ConditionalBranch | ControlFlow::DirectJump | ControlFlow::DirectCall
-        ) {
-        Some(instruction.near_branch_target())
-    } else {
-        None
     };
 
     Ok(DecodedInstruction {
         address: instruction.ip(),
         length: instruction.len() as u8,
         next_address: instruction.next_ip(),
-        direct_target,
+        direct_target: near_target.then(|| instruction.near_branch_target()),
         flow,
     })
 }

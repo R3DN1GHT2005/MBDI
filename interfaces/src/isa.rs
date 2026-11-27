@@ -3,9 +3,11 @@ pub enum ControlFlow {
     Sequential,
     ConditionalBranch,
     DirectJump,
+    DirectFarJump { selector: u16, offset: u32 },
     IndirectJump,
     DirectCall,
     IndirectCall,
+    FarReturn64,
     Return,
     Other,
 }

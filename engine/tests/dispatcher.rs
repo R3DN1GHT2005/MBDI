@@ -513,7 +513,6 @@ fn follows_indirect_calls_from_register_and_memory() -> std::io::Result<()> {
 #[cfg(all(windows, target_arch = "x86_64"))]
 #[test]
 fn follows_indirect_jumps_without_pushing_a_return_address() -> std::io::Result<()> {
-    use std::io;
     use isa::{decode_one, encode_indirect_jump_target_x64, relocate_block};
     use mbdi_engine::{
         execution::dispatcher::{
@@ -527,6 +526,7 @@ fn follows_indirect_jumps_without_pushing_a_return_address() -> std::io::Result<
         },
     };
     use platform_windows::executable::{CodeMemory, ExecutableCode, page_size};
+    use std::io;
 
     #[repr(C)]
     struct Program {

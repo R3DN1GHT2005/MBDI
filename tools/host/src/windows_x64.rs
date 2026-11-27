@@ -1,10 +1,10 @@
 use std::io;
 
-use mbdi_arch_runtime::x64_gate::{X64Gate, X64GuestState};
 use isa::{
     decode_one, emit_jcc_exit_x64, encode_indirect_call_target_x64,
     encode_indirect_jump_target_x64, relocate_block,
 };
+use mbdi_arch_runtime::x64_gate::{X64Gate, X64GuestState};
 use mbdi_engine::{
     execution::dispatcher::{
         BlockOutcome, CachedBlockRuntime, GuestLocation, dispatch_cached_region,
@@ -67,17 +67,13 @@ impl CachedBlockRuntime<ExecutableCode> for WindowsX64Runtime {
                         code.extend_from_slice(&self.gate.call_to(*target, *return_address));
                     }
                     BlockExit::IndirectCall { return_address } => {
-                        let load = encode_indirect_call_target_x64(
-                            site.original_bytes,
-                            site.guest_ip,
-                        )?;
+                        let load =
+                            encode_indirect_call_target_x64(site.original_bytes, site.guest_ip)?;
                         self.gate.emit_indirect_call(&load, *return_address, code);
                     }
                     BlockExit::IndirectJump => {
-                        let load = encode_indirect_jump_target_x64(
-                            site.original_bytes,
-                            site.guest_ip,
-                        )?;
+                        let load =
+                            encode_indirect_jump_target_x64(site.original_bytes, site.guest_ip)?;
                         self.gate.emit_indirect_jump(&load, code);
                     }
                     BlockExit::Return if site.original_bytes == b"\xC3" => {

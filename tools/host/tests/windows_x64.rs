@@ -19,13 +19,13 @@ fn runs_a_region_through_the_shared_x64_adapter() -> std::io::Result<()> {
 
     let mut program = Box::new(Program {
         code: [
-            0xE8, 0x03, 0, 0, 0,                      // +0:  call +8
-            0xEB, 0x14,                               // +5:  jmp +27
-            0x90,                                     // +7:  padding
-            0xFF, 0xE1,                               // +8:  jmp rcx
-            0xFF, 0x25, 0x10, 0, 0, 0,                // +10: jmp [rip + 16]
-            0x48, 0xB8, 0x2A, 0, 0, 0, 1, 0, 0, 0,   // +16: mov rax, 0x10000002a
-            0xC3,                                     // +26: ret
+            0xE8, 0x03, 0, 0, 0, // +0:  call +8
+            0xEB, 0x14, // +5:  jmp +27
+            0x90, // +7:  padding
+            0xFF, 0xE1, // +8:  jmp rcx
+            0xFF, 0x25, 0x10, 0, 0, 0, // +10: jmp [rip + 16]
+            0x48, 0xB8, 0x2A, 0, 0, 0, 1, 0, 0, 0,    // +16: mov rax, 0x10000002a
+            0xC3, // +26: ret
         ],
         target_slot: 0,
     });
